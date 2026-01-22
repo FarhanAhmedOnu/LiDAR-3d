@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+
 from sensor_msgs.msg import LaserScan, PointCloud2
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
@@ -18,7 +19,7 @@ import numpy as np
 import open3d as o3d
 
 # =========================
-# CONFIG
+# CONFIGURATION
 # =========================
 ARDUINO_PORT = "/dev/ttyACM0"
 ARDUINO_BAUD = 115200
@@ -28,8 +29,10 @@ LIDAR_LAUNCH = ["ros2", "launch", "rplidar_ros", "rplidar_c1_launch.py"]
 MIN_RANGE = 0.05
 MAX_RANGE = 12.0
 
-ENABLE_OPEN3D = True
+ANGLE_RESOLUTION_DEG = 0.5     # tilt bin size
 MAX_BUFFER_POINTS = 150_000
+
+ENABLE_OPEN3D = True
 
 # =========================
 # NODE
@@ -80,6 +83,7 @@ class Lidar3DTilt(Node):
         )
 
         # ---------- Data ----------
+        self.angle_bins = {}      # tilt_bin -> [(x,y,z)]
         self.points = []
         self.point_count = 0
 
@@ -91,7 +95,7 @@ class Lidar3DTilt(Node):
             self.init_open3d()
 
     # =========================
-    # SERVO READER
+    # SERVO ANGLE READER
     # =========================
     def read_servo_angle(self):
         while self.running:
@@ -106,32 +110,38 @@ class Lidar3DTilt(Node):
     # LIDAR CALLBACK
     # =========================
     def scan_callback(self, msg):
-        tilt = self.current_tilt_rad
-        angle = msg.angle_min
+        tilt_deg = math.degrees(self.current_tilt_rad)
+        tilt_bin = round(tilt_deg / ANGLE_RESOLUTION_DEG) * ANGLE_RESOLUTION_DEG
+        tilt_rad = math.radians(tilt_bin)
 
-        new_pts = []
+        angle = msg.angle_min
+        new_slice = []
 
         for r in msg.ranges:
             if MIN_RANGE < r < MAX_RANGE:
-                x = r * math.cos(tilt) * math.cos(angle)
-                y = r * math.cos(tilt) * math.sin(angle)
-                z = r * math.sin(tilt)
-
-                new_pts.append((x, y, z))
-
+                x = r * math.cos(tilt_rad) * math.cos(angle)
+                y = r * math.cos(tilt_rad) * math.sin(angle)
+                z = r * math.sin(tilt_rad)
+                new_slice.append((x, y, z))
             angle += msg.angle_increment
 
-        if not new_pts:
+        if not new_slice:
             return
 
-        # ---------- Store ----------
-        self.points.extend(new_pts)
-        self.points = self.points[-MAX_BUFFER_POINTS:]
-        self.point_count += len(new_pts)
+        # 🔁 Replace slice for this tilt angle
+        self.angle_bins[tilt_bin] = new_slice
+
+        # Rebuild cloud
+        all_pts = []
+        for pts in self.angle_bins.values():
+            all_pts.extend(pts)
+
+        self.points = all_pts[-MAX_BUFFER_POINTS:]
+        self.point_count = len(self.points)
 
         # ---------- Save ----------
         with open(self.filename, "a") as f:
-            for p in new_pts:
+            for p in new_slice:
                 f.write(f"{p[0]:.4f} {p[1]:.4f} {p[2]:.4f}\n")
 
         # ---------- Publish ----------
@@ -139,9 +149,7 @@ class Lidar3DTilt(Node):
         header.stamp = self.get_clock().now().to_msg()
         header.frame_id = "lidar"
 
-        cloud_msg = point_cloud2.create_cloud_xyz32(
-            header, self.points
-        )
+        cloud_msg = point_cloud2.create_cloud_xyz32(header, self.points)
         self.pc_pub.publish(cloud_msg)
 
         # ---------- Visualize ----------
@@ -149,7 +157,7 @@ class Lidar3DTilt(Node):
             self.update_open3d()
 
         if self.point_count % 10000 == 0:
-            self.get_logger().info(f"Points: {self.point_count}")
+            self.get_logger().info(f"Points in cloud: {self.point_count}")
 
     # =========================
     # OPEN3D
@@ -161,6 +169,8 @@ class Lidar3DTilt(Node):
         self.vis.add_geometry(self.pcd)
 
     def update_open3d(self):
+        if not self.points:
+            return
         self.pcd.points = o3d.utility.Vector3dVector(
             np.asarray(self.points)
         )
@@ -169,19 +179,28 @@ class Lidar3DTilt(Node):
         self.vis.update_renderer()
 
     # =========================
-    # SHUTDOWN
+    # CLEAN SHUTDOWN (NO ROS SHUTDOWN HERE)
     # =========================
     def shutdown(self):
         self.running = False
 
-        if ENABLE_OPEN3D:
-            self.vis.destroy_window()
+        try:
+            if ENABLE_OPEN3D:
+                self.vis.destroy_window()
+        except:
+            pass
 
-        if self.ser:
-            self.ser.close()
+        try:
+            if self.ser:
+                self.ser.close()
+        except:
+            pass
 
-        if self.lidar_process:
-            os.killpg(os.getpgid(self.lidar_process.pid), signal.SIGINT)
+        try:
+            if self.lidar_process:
+                os.killpg(os.getpgid(self.lidar_process.pid), signal.SIGINT)
+        except:
+            pass
 
         self.destroy_node()
 
@@ -198,7 +217,8 @@ def main():
         pass
     finally:
         node.shutdown()
-        rclpy.shutdown()
+        if rclpy.ok():
+            rclpy.shutdown()
         print(f"\nSaved {node.point_count} points")
 
 if __name__ == "__main__":
