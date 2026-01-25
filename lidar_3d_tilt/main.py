@@ -5,6 +5,7 @@ from sensor_msgs.msg import LaserScan
 import traceback
 import sys
 import time
+import threading
 
 from config import *
 from servo_controller import ServoController
@@ -17,6 +18,9 @@ class Lidar3DTiltNode(Node):
         super().__init__("lidar_3d_tilt")
         
         print("Initializing 3D LiDAR Tilt Node...")
+        
+        self._shutdown_lock = threading.Lock()
+        self._is_shutdown = False
         
         try:
             # Initialize LiDAR first
@@ -49,7 +53,7 @@ class Lidar3DTiltNode(Node):
         except Exception as e:
             print(f"ERROR during initialization: {e}")
             traceback.print_exc()
-            self.shutdown()
+            self._safe_shutdown()
             raise
     
     def scan_callback(self, msg):
@@ -66,17 +70,34 @@ class Lidar3DTiltNode(Node):
         except Exception as e:
             self.get_logger().error(f"Publish error: {e}")
     
-    def shutdown(self):
-        print("Shutting down node...")
-        if hasattr(self, 'servo'):
-            self.servo.close()
-        if hasattr(self, 'lidar'):
-            self.lidar.stop()
-        
-        try:
-            self.destroy_node()
-        except:
-            pass
+    def _safe_shutdown(self):
+        """Thread-safe shutdown to prevent multiple calls"""
+        with self._shutdown_lock:
+            if self._is_shutdown:
+                return
+            self._is_shutdown = True
+            
+            print("Shutting down node...")
+            
+            # Shutdown servo
+            if hasattr(self, 'servo') and self.servo:
+                try:
+                    self.servo.close()
+                except Exception as e:
+                    print(f"Error closing servo: {e}")
+            
+            # Shutdown LiDAR
+            if hasattr(self, 'lidar') and self.lidar:
+                try:
+                    self.lidar.stop()
+                except Exception as e:
+                    print(f"Error stopping LiDAR: {e}")
+            
+            # Destroy node
+            try:
+                self.destroy_node()
+            except:
+                pass
 
 def main():
     rclpy.init()
@@ -91,9 +112,18 @@ def main():
         print(f"Fatal error: {e}")
         traceback.print_exc()
     finally:
+        # Shutdown node first
         if node:
-            node.shutdown()
-        rclpy.shutdown()
+            node._safe_shutdown()
+        
+        # Then shutdown ROS with error handling
+        try:
+            if rclpy.ok():
+                rclpy.shutdown()
+        except Exception as e:
+            # Ignore shutdown errors (already shutdown)
+            pass
+        
         print("Program terminated")
 
 if __name__ == "__main__":

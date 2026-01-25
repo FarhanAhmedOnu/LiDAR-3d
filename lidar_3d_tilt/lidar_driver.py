@@ -3,14 +3,13 @@ import subprocess
 import os
 import signal
 import time
-import atexit
 
 class LidarDriver:
     def __init__(self, launch_cmd):
         self.proc = None
         self.launch_cmd = launch_cmd
+        self._shutdown_called = False
         self._start_lidar()
-        atexit.register(self._emergency_stop)
 
     def _start_lidar(self):
         """Start the LiDAR process"""
@@ -29,6 +28,10 @@ class LidarDriver:
 
     def stop(self):
         """Orderly stop of LiDAR"""
+        if self._shutdown_called:
+            return
+        
+        self._shutdown_called = True
         self._kill_lidar()
 
     def _kill_lidar(self):
@@ -57,7 +60,3 @@ class LidarDriver:
                 print(f"Error stopping LiDAR: {e}")
             finally:
                 self.proc = None
-
-    def _emergency_stop(self):
-        """Emergency stop called on program exit"""
-        self._kill_lidar()

@@ -3,7 +3,6 @@ import serial
 import math
 import threading
 import time
-import atexit
 
 class ServoController:
     def __init__(self, port, baud):
@@ -11,6 +10,7 @@ class ServoController:
         self.current_tilt_rad = 0.0
         self.running = True
         self.servo_ready = False
+        self._shutdown_called = False
         
         # Wait for Arduino to initialize
         print("Waiting for Arduino...")
@@ -37,9 +37,6 @@ class ServoController:
         # Start sweep control thread
         self.sweep_thread = threading.Thread(target=self._sweep_control, daemon=True)
         self.sweep_thread.start()
-        
-        # Register emergency cleanup
-        atexit.register(self._emergency_cleanup)
     
     def _sweep_control(self):
         """Control the servo sweep pattern"""
@@ -74,7 +71,8 @@ class ServoController:
                 time.sleep(0.03)  # ~30ms delay
                 
             except Exception as e:
-                print(f"Error in sweep control: {e}")
+                if self.running:  # Only print error if we're still running
+                    print(f"Error in sweep control: {e}")
                 break
     
     def get_tilt_rad(self):
@@ -82,6 +80,9 @@ class ServoController:
     
     def _emergency_cleanup(self):
         """Center servo and cleanup on exit"""
+        if self._shutdown_called:
+            return
+        
         print("Emergency cleanup - centering servo...")
         try:
             # Send center command
@@ -97,8 +98,16 @@ class ServoController:
     
     def close(self):
         """Graceful shutdown"""
+        if self._shutdown_called:
+            return
+        
+        self._shutdown_called = True
         print("Closing servo controller...")
         self.running = False
+        
+        # Wait for sweep thread to finish
         if self.sweep_thread.is_alive():
             self.sweep_thread.join(timeout=2.0)
+        
+        # Do cleanup
         self._emergency_cleanup()
