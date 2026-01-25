@@ -1,5 +1,5 @@
 # config.py
-ARDUINO_PORT = "/dev/ttyACM1"
+ARDUINO_PORT = "/dev/ttyACM0"
 ARDUINO_BAUD = 115200
 
 LIDAR_LAUNCH = ["ros2", "launch", "rplidar_ros", "rplidar_c1_launch.py"]
