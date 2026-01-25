@@ -1,4 +1,6 @@
+// sketch_firmata.ino
 #include <Servo.h>
+#include <Firmata.h>
 
 // ============================
 // CONFIGURATION
@@ -29,13 +31,18 @@ float direction = 1.0;
 unsigned long last_update = 0;
 
 void setup() {
-  Serial.begin(115200);
+  Firmata.begin(57600);
   tiltServo.attach(SERVO_PIN);
   tiltServo.write(SERVO_CENTER);
   delay(500);
 }
 
 void loop() {
+  // Process Firmata commands
+  while (Firmata.available()) {
+    Firmata.processInput();
+  }
+  
   unsigned long now = millis();
 
   if (now - last_update >= UPDATE_INTERVAL_MS) {
@@ -57,7 +64,7 @@ void loop() {
     float servo_angle = SERVO_CENTER + tilt_deg;
     tiltServo.write(servo_angle);
 
-    // Stream tilt angle (degrees)
-    Serial.println(tilt_deg, 2);
+    // Send tilt angle via Firmata
+    Firmata.sendAnalog(SERVO_PIN, tilt_deg * 1000); // Send as integer (scaled by 1000)
   }
 }
