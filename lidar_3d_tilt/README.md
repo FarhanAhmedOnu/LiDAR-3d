@@ -25,10 +25,7 @@ graph TD
         H -->|PointCloud2| J[/lidar_3d/points/]
     end
     
-    style A fill:#e1f5e1
-    style C fill:#e1f5e1
-    style D fill:#fff3e0
-    style G fill:#e8f5e8
+    
 ```
 
 ## **2. Core Design Philosophy**
@@ -65,14 +62,7 @@ graph TD
     J[Note: Constraint prevents<br/>mechanical damage] --> F
     K[Note: Confirmation ensures<br/>synchronization] --> H
     
-    style A fill:#ff5722,stroke:#333,stroke-width:2px
-    style B fill:#4caf50,stroke:#333,stroke-width:2px
-    style C fill:#2196f3,stroke:#333,stroke-width:2px
-    style D fill:#ff9800,stroke:#333,stroke-width:2px
-    style E fill:#9c27b0,stroke:#333,stroke-width:2px
-    style F fill:#f44336,stroke:#333,stroke-width:2px
-    style G fill:#009688,stroke:#333,stroke-width:2px
-    style H fill:#795548,stroke:#333,stroke-width:2px
+    
     
 ```
 
@@ -222,9 +212,7 @@ graph TB
     B -->|LiDAR Process| J[lidar_driver._kill_lidar]
     J --> K[SIGINT → SIGTERM → SIGKILL]
     
-    style C fill:#ffebee
-    style F fill:#ffebee
-    style J fill:#ffebee
+    
 ```
 
 ### **4.2 Specific Protection Mechanisms**
