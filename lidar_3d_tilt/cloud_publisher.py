@@ -1,5 +1,5 @@
-# cloud_publisher.py
-from sensor_msgs.msg import PointCloud2
+# cloud_publisher.py (Modified)
+from sensor_msgs.msg import PointCloud2, PointField
 from sensor_msgs_py import point_cloud2
 from std_msgs.msg import Header
 
@@ -18,5 +18,13 @@ class CloudPublisher:
         header.stamp = self.node.get_clock().now().to_msg()
         header.frame_id = "lidar"
 
-        cloud = point_cloud2.create_cloud_xyz32(header, points)
+        # Define fields for XYZ + Intensity (using Z as intensity)
+        fields = [
+            PointField(name='x', offset=0, datatype=PointField.FLOAT32, count=1),
+            PointField(name='y', offset=4, datatype=PointField.FLOAT32, count=1),
+            PointField(name='z', offset=8, datatype=PointField.FLOAT32, count=1),
+            PointField(name='intensity', offset=12, datatype=PointField.FLOAT32, count=1),
+        ]
+
+        cloud = point_cloud2.create_cloud(header, fields, points)
         self.pub.publish(cloud)

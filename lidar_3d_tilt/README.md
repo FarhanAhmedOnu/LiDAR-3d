@@ -150,14 +150,14 @@ Tilted 3D System: Requires rotation around Y-axis
 
 ```mermaid
 graph TD
-    subgraph "Data Processing Pipeline"
+    subgraph "Data Processing Pipeline" TD
         A[Raw Scan] --> B[Range Filtering<br/>0.1m < r < 12m]
         B --> C[2D to 3D Transform<br/>with tilt angle α]
         C --> D[Lever-arm Compensation<br/>x + offset_x, z + offset_z]
         D --> E[Angle Bin Storage<br/>resolution: 0.5°]
     end
     
-    subgraph "Memory Management"
+    subgraph "Memory Management" TD
         F[Tilt Bin Dictionary] --> G[Key: rounded tilt angle]
         G --> H[Value: point list]
         I[Sweep Reset Logic] --> J[Clear at -14.5°<br/>once per second]
