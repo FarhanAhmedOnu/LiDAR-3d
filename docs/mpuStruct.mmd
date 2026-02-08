@@ -1,0 +1,26 @@
+graph TB
+    subgraph "Hardware Layer"
+        L[2D LiDAR] -->|Serial Data| R[ROS2]
+        S[Servo Motor] -->|Position Control| M[Arduino]
+        I[IMU MPU6050] -->|Pitch Data| M2[Arduino]
+    end
+    
+    subgraph "Software Layer"
+        R -->|LaserScan msgs| PB[PointBuilder]
+        M -->|Serial Comm| SC[ServoController]
+        M2 -->|Serial Comm| IR[IMUReader]
+        
+        PB -->|3D Points| CP[CloudPublisher]
+        IR -->|Tilt Angle| PB
+        SC -->|Position Control| M
+        
+        subgraph "Main Control"
+            MN[Lidar3DNode] --> SC
+            MN --> IR
+            MN --> PB
+            MN --> CP
+            MN --> LD[LidarDriver]
+        end
+    end
+    
+    CP -->|PointCloud2| RV[Rviz/ROS]

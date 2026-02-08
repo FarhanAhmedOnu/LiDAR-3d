@@ -9,12 +9,14 @@ TILT_MAX = 110.0
 TILT_CENTER = 90.0
 
 # Resolution and Memory
-ANGLE_RESOLUTION_DEG = 0.5
+ANGLE_RESOLUTION_DEG = 1
 PUBLISH_RATE_HZ = 10
 MAX_BUFFER_POINTS = 200_000
 
 # Physical Offsets
-LIDAR_OFFSET_X = 0.03 
-LIDAR_OFFSET_Z = 0.05
+# LIDAR_OFFSET_X = 0.03 
+# LIDAR_OFFSET_Z = 0.05
+LIDAR_OFFSET_X = 0.01 
+LIDAR_OFFSET_Z = 0.03
 
 LIDAR_LAUNCH = ["ros2", "launch", "rplidar_ros", "rplidar_c1_launch.py"]
