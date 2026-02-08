@@ -6,7 +6,7 @@ import multiprocessing
 import time
 
 # --- CONFIGURATION ---
-LIDAR_OFFSET_X = 0.01 
+LIDAR_OFFSET_X = 0.00 
 LIDAR_OFFSET_Z = 0.03
 FILENAME = "lidar_sweep_data.pkl"
 
