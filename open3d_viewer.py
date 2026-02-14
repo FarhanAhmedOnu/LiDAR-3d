@@ -16,7 +16,7 @@ def load_xyz(filename):
 
 if len(sys.argv) < 2:
     files = sorted([f for f in os.listdir('.') if f.endswith('.xyz')], key=os.path.getctime)
-    # filename = "scan_20260120_150754.xyz"
+    # filename = "scan_20260214_123844.xyz"
     filename = files[-1]
 else:
     filename = sys.argv[1]
