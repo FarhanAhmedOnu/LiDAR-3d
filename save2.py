@@ -187,7 +187,7 @@ class Lidar3DScanner(Node):
         plt.show()
         
         # Full sweep range (e.g., 60 to 120 degrees)
-        sweep_range = list(range(60, 120, 1)) 
+        sweep_range = list(range(40, 140, 1)) 
         
         try:
             # --- Perform exactly one sweep ---
