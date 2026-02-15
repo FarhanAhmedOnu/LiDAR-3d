@@ -233,7 +233,7 @@ class Lidar3DScanner(Node):
                         # Scatter with color mapped to intensity
                         sc = self.ax.scatter(self.all_x, self.all_y, self.all_z,
                                              s=2, c=self.all_intensity, cmap='viridis')
-                        self.fig.colorbar(sc, ax=self.ax, label='Intensity')
+                        # self.fig.colorbar(sc, ax=self.ax, label='Intensity')
                         
                         self.fig.canvas.draw()
                         self.fig.canvas.flush_events()
