@@ -63,7 +63,13 @@ def main():
     print(f"Loaded {len(points)} points.")
 
     # --- 3. Slight Z exaggeration (servo-based 3D scan aid) ---
-    points[:, 2] *= 1.4
+    # points[:, 2] *= 1.4
+    points[:, 2] *= 1.0
+    
+    xy_scale = 1.6   # try 1.2–2.0
+
+    points[:, 0] *= xy_scale   # X
+    points[:, 1] *= 1   # Y
 
     # --- 4. Create Point Cloud ---
     pcd = o3d.geometry.PointCloud()
@@ -80,7 +86,7 @@ def main():
     colors = cm.viridis(1.0 - d_norm)[:, :3]
 
     # --- 6. Depth fog (strong human depth perception cue) ---
-    fog_strength = .65
+    fog_strength = 0.65
     fog = (d_norm ** 1.5)[:, None]
     colors = colors * (1.0 - fog_strength * fog)
 
