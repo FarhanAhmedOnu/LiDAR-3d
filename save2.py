@@ -15,6 +15,7 @@ import sys
 import os
 import datetime
 
+time.sleep(20)
 class Lidar3DScanner(Node):
     def __init__(self):
         super().__init__('lidar_3d_scanner')
