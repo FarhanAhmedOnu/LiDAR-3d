@@ -68,7 +68,7 @@ def main():
     
     xy_scale = 1.6   # try 1.2–2.0
 
-    points[:, 0] *= xy_scale   # X
+    points[:, 0] *= 1   # X
     points[:, 1] *= 1   # Y
 
     # --- 4. Create Point Cloud ---

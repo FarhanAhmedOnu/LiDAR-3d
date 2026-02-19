@@ -1,0 +1,70 @@
+@startuml
+!define RECTANGLE class
+skinparam defaultFontSize 26
+skinparam componentStyle rectangle
+skinparam backgroundColor white
+
+skinparam node {
+  BackgroundColor LightGray
+  BorderColor Black
+  FontStyle bold
+}
+skinparam component {
+  BackgroundColor LightBlue
+  BorderColor Navy
+  FontStyle plain
+}
+skinparam package {
+  BackgroundColor WhiteSmoke
+  BorderColor Gray
+  FontStyle bold
+}
+
+' Hardware Layer
+node "Hardware" {
+  node "2D LiDAR" as L
+  node "Servo Motor" as S
+  node "IMU MPU6050" as I
+}
+
+' Software/Firmware Layer
+package "Microcontrollers" {
+  component "Arduino (Servo)" as M
+  component "Arduino2 (IMU)" as M2
+}
+
+package "ROS2 Software Layer" {
+  component "LidarDriver" as LD
+  component "ServoController" as SC
+  component "IMUReader" as IR
+  component "PointBuilder" as PB
+  component "CloudPublisher" as CP
+  
+  package "Main Control Node" {
+    component "Lidar3DNode" as MN
+  }
+}
+
+' Connections: Hardware to MCU
+L -[#blue]-> LD : Serial/USB Data
+S <-[#green]- M : PWM Signal
+I -[#orange]-> M2 : I2C Data
+
+' Connections: MCU to ROS2
+M <--> SC : Serial Comm
+M2 -[#orange]-> IR : Serial Comm
+
+' Internal ROS2 Flow
+LD -[#blue]-> PB : LaserScan
+SC -[#green]-> PB : Current Angle
+IR -[#orange]-> PB : Tilt Data
+PB -[#purple]-> CP : 3D Point Data
+
+' Main Node Management
+MN ..> SC : Triggers Sweep
+MN ..> LD : Monitors
+MN ..> PB : Configures
+
+' Output
+CP -[#red]-> "Rviz2" : PointCloud2
+@enduml
