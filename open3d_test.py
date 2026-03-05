@@ -1,64 +1,58 @@
 import open3d as o3d
 import numpy as np
+import sys
 import os
 import matplotlib.cm as cm
 
 
-# =========================================================
+# -------------------------------------------------
 # Load xyz / Rxyz
-# =========================================================
+# -------------------------------------------------
 def load_xyz(filename):
     pts = []
+    intensities = []
+
+    print(f"Loading {filename}...")
 
     with open(filename, 'r') as f:
         for line in f:
             if line.startswith("#"):
                 continue
+
             parts = line.split()
             if len(parts) >= 3:
                 try:
-                    pts.append([float(parts[0]), float(parts[1]), float(parts[2])])
-                except:
-                    pass
+                    x, y, z = float(parts[0]), float(parts[1]), float(parts[2])
+                    pts.append([x, y, z])
 
-    return np.asarray(pts)
+                    if len(parts) >= 4:
+                        intensities.append(float(parts[3]))
+                except ValueError:
+                    continue
+
+    points = np.array(pts)
+    if intensities:
+        return points, np.array(intensities)
+    else:
+        return points, None
 
 
-# =========================================================
-# Build point cloud with filters
-# =========================================================
-def make_cloud(points, state):
+# -------------------------------------------------
+# Convert points → colored Open3D cloud
+# -------------------------------------------------
+def make_cloud(points):
+    points = points.copy()
 
-    pts = points.copy()
-
-    # ---------- scaling (optional) ----------
-    pts[:, 2] *= 1.0
+    # scaling
+    points[:, 2] *= 1.0
+    points[:, 0] *= 1
+    points[:, 1] *= 1
 
     pcd = o3d.geometry.PointCloud()
-    pcd.points = o3d.utility.Vector3dVector(pts)
+    pcd.points = o3d.utility.Vector3dVector(points)
 
-    # =====================================================
-    # 1) VOXEL DOWNSAMPLE
-    # =====================================================
-    if state["voxel_enabled"]:
-        pcd = pcd.voxel_down_sample(state["voxel_size"])
-
-    # =====================================================
-    # 2) STATISTICAL OUTLIER REMOVAL (SOR)
-    # =====================================================
-    if state["sor_enabled"]:
-        pcd, _ = pcd.remove_statistical_outlier(
-            nb_neighbors=state["sor_neighbors"],
-            std_ratio=state["sor_std"]
-        )
-
-    pts = np.asarray(pcd.points)
-
-    # =====================================================
-    # Depth coloring
-    # =====================================================
-    dist = np.linalg.norm(pts, axis=1)
-
+    # depth coloring
+    dist = np.linalg.norm(points, axis=1)
     d_min, d_max = np.percentile(dist, [2, 98])
     dist = np.clip(dist, d_min, d_max)
     d_norm = (dist - d_min) / (d_max - d_min + 1e-8)
@@ -67,14 +61,13 @@ def make_cloud(points, state):
 
     fog_strength = 0.65
     fog = (d_norm ** 1.5)[:, None]
-    colors *= (1.0 - fog_strength * fog)
+    colors = colors * (1.0 - fog_strength * fog)
 
     pcd.colors = o3d.utility.Vector3dVector(colors)
 
-    # normals AFTER filtering
     pcd.estimate_normals(
         search_param=o3d.geometry.KDTreeSearchParamHybrid(
-            radius=max(state["voxel_size"], 0.03) * 3,
+            radius=0.15,
             max_nn=30
         )
     )
@@ -82,35 +75,26 @@ def make_cloud(points, state):
     return pcd
 
 
-# =========================================================
+# -------------------------------------------------
 # Main
-# =========================================================
+# -------------------------------------------------
 def main():
 
-    # runtime state (NO GLOBALS)
-    state = {
-        "voxel_enabled": True,
-        "voxel_size": 0.03,
-
-        "sor_enabled": True,
-        "sor_neighbors": 20,
-        "sor_std": 1.5
-    }
-
-    # gather scans
+    # ---- collect all scans ----
     files = sorted(
         [f for f in os.listdir('.') if f.endswith('.xyz') or f.endswith('.Rxyz')],
         key=os.path.getctime
     )
 
     if not files:
-        print("No scans found")
+        print("No scan files found")
         return
 
+    # start at latest
     current_idx = len(files) - 1
 
     vis = o3d.visualization.VisualizerWithKeyCallback()
-    vis.create_window("LiDAR Scan Browser + Filters", 1280, 720)
+    vis.create_window("LiDAR Scan Browser", 1280, 720)
 
     opt = vis.get_render_option()
     opt.background_color = np.asarray([0, 0, 0])
@@ -120,18 +104,17 @@ def main():
 
     geometry = None
 
-
-    # -----------------------------------------------------
-    # reload cloud
-    # -----------------------------------------------------
+    # -------------------------------------------
+    # load + display function
+    # -------------------------------------------
     def load_index(idx):
         nonlocal geometry, current_idx
 
         current_idx = idx
         filename = files[current_idx]
 
-        pts = load_xyz(filename)
-        geometry = make_cloud(pts, state)
+        pts, _ = load_xyz(filename)
+        geometry = make_cloud(pts)
 
         vis.clear_geometries()
         vis.add_geometry(geometry)
@@ -144,17 +127,13 @@ def main():
 
         vis.update_renderer()
 
-        print(
-            f"[{current_idx+1}/{len(files)}] {filename} | "
-            f"voxel={state['voxel_enabled']} {state['voxel_size']:.3f} | "
-            f"SOR={state['sor_enabled']} k={state['sor_neighbors']} std={state['sor_std']}"
-        )
+        print(f"[{current_idx+1}/{len(files)}] Showing: {filename}")
 
 
-    # =====================================================
-    # KEY CALLBACKS
-    # =====================================================
-    def prev_scan(vis):
+    # -------------------------------------------
+    # Key callbacks
+    # -------------------------------------------
+    def previous_scan(vis):
         if current_idx > 0:
             load_index(current_idx - 1)
         return False
@@ -165,66 +144,17 @@ def main():
         return False
 
 
-    # ---------- voxel ----------
-    def toggle_voxel(vis):
-        state["voxel_enabled"] = not state["voxel_enabled"]
-        load_index(current_idx)
-        return False
-
-    def voxel_smaller(vis):
-        state["voxel_size"] *= 0.3
-        load_index(current_idx)
-        return False
-
-    def voxel_larger(vis):
-        state["voxel_size"] *= 1.25
-        load_index(current_idx)
-        return False
-
-
-    # ---------- SOR ----------
-    def toggle_sor(vis):
-        state["sor_enabled"] = not state["sor_enabled"]
-        load_index(current_idx)
-        return False
-
-    def sor_weaker(vis):
-        state["sor_neighbors"] = max(5, state["sor_neighbors"] - 5)
-        load_index(current_idx)
-        return False
-
-    def sor_stronger(vis):
-        state["sor_neighbors"] += 5
-        load_index(current_idx)
-        return False
-
-
-    # =====================================================
-    # register keys
-    # =====================================================
-    vis.register_key_callback(ord("P"), prev_scan)
+    # P = previous, N = next
+    vis.register_key_callback(ord("P"), previous_scan)
     vis.register_key_callback(ord("N"), next_scan)
 
-    vis.register_key_callback(ord("V"), toggle_voxel)
-    vis.register_key_callback(ord("["), voxel_smaller)
-    vis.register_key_callback(ord("]"), voxel_larger)
-
-    vis.register_key_callback(ord("O"), toggle_sor)
-    vis.register_key_callback(ord(","), sor_weaker)
-    vis.register_key_callback(ord("."), sor_stronger)
-
-
+    # initial load
     load_index(current_idx)
 
-    print("""
-Controls
---------
-P/N : prev/next
-V   : voxel toggle
-[ ] : voxel size
-O   : outlier toggle
-, . : outlier strength
-""")
+    print("Controls:")
+    print("   P → previous scan")
+    print("   N → next scan")
+    print("   Mouse → rotate/zoom")
 
     vis.run()
     vis.destroy_window()
